@@ -2,8 +2,8 @@
 
 let socket;
 let oscPort;
-let OSC_PORT = 3333;
-let oscsocket_uri = "ws://localhost:3333";
+let OSC_PORT = 3000;
+let oscsocket_uri = `ws://localhost:${OSC_PORT}`;
 let isOscPortOpen = false;
 
 // for change detection
@@ -165,6 +165,6 @@ function sendOSCMessages() {
       });
       lastSentEeg.gamma = eeg.gamma;  // update last sent value
     }
-    
+
   }
 }
