@@ -1,21 +1,11 @@
 // P5 entry point and main loop
 
 let socket;
-let oscPort;
-let OSC_PORT = 3000;
-let oscsocket_uri = `ws://localhost:${OSC_PORT}`;
-let isOscPortOpen = false;
+let socket_uri = `ws://localhost:3333/ws`; // port must match the port the app is listening on
+let oscPort;  // for the OSC WebSocketPort
 
-// for change detection
-let lastSentPpg = null;
-let lastSentEeg = {
-    delta: null,
-    theta: null,
-    alpha: null,
-    beta: null,
-    gamma: null
-};
-
+let prevEegData = {};
+let prevPpgData = {};
 
 function setup() {
 
@@ -24,14 +14,29 @@ function setup() {
   setupMuse();
 
   // Initialize the WebSocket connection to the osc-web bridge
-  socket = new WebSocket(oscsocket_uri);
-  console.log("OSC sending from " + oscsocket_uri)
+  socket = new WebSocket(socket_uri);
+  console.log("web socket listening on " + socket_uri)
 
   socket.onopen = function() {
+    oscPort = new osc.WebSocketPort({
+      socket: socket
+    });
+    oscPort.open();
+  };
+  socket.onclose = (event) => {
+    if (event.wasClean) {
+      console.log(`WebSocket connection closed cleanly, code=${event.code} reason=${event.reason}`);
+    } else {
+      console.log('WebSocket connection died, attempting restart'); // for example, server process killed or network down
       oscPort = new osc.WebSocketPort({
-          socket: socket
+        socket: socket
       });
-      isOscPortOpen = true;
+      oscPort.open();
+      console.log("Reopened WebSocketPort on " + socket_uri)
+    }
+  };
+  socket.onerror = (error) => {
+    console.log(`WebSocket error: ${error}`);
   };
 
 }
@@ -83,88 +88,32 @@ function draw() {
   text('GYRO Y: ' + gyro.y, 10, 225);
   text('GYRO Z: ' + gyro.z, 10, 240);
 
-  // send OSC outputs
-  text('OSC sending on: ' + oscsocket_uri, 10, height-20);
-  sendOSCMessages()
-
+  // after signal processing and UI updates, send OSC messages
+  if (socket.readyState === WebSocket.OPEN) {
+    sendOSCMessages(eeg, '/muse/eeg/');
+    sendOSCMessages(ppg, '/muse/ppg/');
+  }
 }
 
 
-function sendOSCMessages() {
-  // Once a sensor value has been updated, check if it has changed since the last sent value
-  if (isOscPortOpen) {
-    if (ppg.heartbeat) {
-      // TODO: add a flipflop on this to turn it off if we've received it once already
-      oscPort.send({
-        address: "/muse/ppg/heartbeat",
-        args: [{
-          type: "i",
-          value: 1
-        }]
-      });
-    }
-    
-    if (ppg.bpm !== lastSentPpg) {
-      oscPort.send({
-          address: "/muse/ppg/bpm",
-          args: [{
-            type: "f",
-            value: ppg.bpm
-          }]
-      });
-      lastSentPpg = ppg.bpm;  // update last sent value
-    }
+function sendOSCMessages(data, prefix) {
+  // Choose the correct cache based on the prefix
+  let prevData = prefix === '/muse/eeg/' ? prevEegData : prevPpgData;
 
-    if (eeg.delta !== lastSentEeg.delta) {
-      oscPort.send({
-          address: "/muse/eeg/delta",
-          args: [{
-            type: "f",
-            value: eeg.delta
-          }]
-      });
-      lastSentEeg.delta = eeg.delta;  // update last sent value
+  Object.entries(data).forEach(([key, value]) => {
+    // Check if value has changed
+    if (!prevData[key] || prevData[key] !== value) {
+      const address = prefix + key;
+      const message = {
+        address: address,
+        args: value
+      };
+      const binaryData = osc.writeMessage(message);
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(binaryData);
+      }
+      // Update prevData with new value
+      prevData[key] = value;
     }
-    if (eeg.theta !== lastSentEeg.theta) {
-      oscPort.send({
-          address: "/muse/eeg/theta",
-          args: [{
-            type: "f",
-            value: eeg.theta
-          }]
-      });
-      lastSentEeg.theta = eeg.theta;  // update last sent value
-    }
-    if (eeg.alpha !== lastSentEeg.alpha) {
-      oscPort.send({
-          address: "/muse/eeg/alpha",
-          args: [{
-            type: "f",
-            value: eeg.alpha
-          }]
-      });
-      lastSentEeg.alpha = eeg.alpha;  // update last sent value
-    }
-    if (eeg.beta !== lastSentEeg.beta) {
-      oscPort.send({
-          address: "/muse/eeg/beta",
-          args: [{
-            type: "f",
-            value: eeg.beta
-          }]
-      });
-      lastSentEeg.beta = eeg.beta;  // update last sent value
-    }
-    if (eeg.gamma !== lastSentEeg.gamma) {
-      oscPort.send({
-          address: "/muse/eeg/gamma",
-          args: [{
-            type: "f",
-            value: eeg.gamma
-          }]
-      });
-      lastSentEeg.gamma = eeg.gamma;  // update last sent value
-    }
-
-  }
+  });
 }

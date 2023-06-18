@@ -19,6 +19,7 @@ npm start
 ```
 This will start a webapp at http://localhost:3333
 
+Turn on the Muse headset
 
 
 
