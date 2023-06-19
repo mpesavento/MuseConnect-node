@@ -182,7 +182,7 @@ class p5BLE {
       return this.device.addEventListener('gattserverdisconnected', handleDisconnected);
     }
   
-    isConnected() {
+    museIsConnected() {
       if (!this.device) return false;
       if (this.device.gatt.connected) {
         return true;

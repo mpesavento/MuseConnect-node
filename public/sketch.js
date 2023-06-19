@@ -1,43 +1,46 @@
 // P5 entry point and main loop
 
 let socket;
-let socket_uri = `ws://localhost:3333/ws`; // port must match the port the app is listening on
+let socket_uri = `ws://localhost:3333`; // port must match the port the app is listening on
 let oscPort;  // for the OSC WebSocketPort
+let socketIsConnected = false;
 
 let prevEegData = {};
 let prevPpgData = {};
+
+function setupSocket() {
+  socket = new WebSocket('ws://localhost:3333');
+
+  socket.onopen = () => {
+    console.log("WebSocket connection opened.");
+    socketIsConnected = true;
+    oscPort = new osc.WebSocketPort({
+      socket: socket
+    });
+    oscPort.open();
+  };
+
+  socket.onclose = (event) => {
+    if (event.wasClean) {
+      console.log(`WebSocket connection closed cleanly, code=${event.code} reason=${event.reason}`);
+    } else {
+      console.log('WebSocket connection died'); // for example, server process killed or network down
+      museIsConnected = false;
+      setTimeout(setupSocket, 5000); // Try to reconnect every 5 seconds
+    }
+  };
+
+  socket.onerror = (error) => {
+    console.log(`WebSocket error: ${error}`);
+  };
+}
 
 function setup() {
 
   createCanvas(400, 400);
 
   setupMuse();
-
-  // Initialize the WebSocket connection to the osc-web bridge
-  socket = new WebSocket(socket_uri);
-  console.log("web socket listening on " + socket_uri)
-
-  socket.onopen = function() {
-    oscPort = new osc.WebSocketPort({
-      socket: socket
-    });
-    oscPort.open();
-  };
-  socket.onclose = (event) => {
-    if (event.wasClean) {
-      console.log(`WebSocket connection closed cleanly, code=${event.code} reason=${event.reason}`);
-    } else {
-      console.log('WebSocket connection died, attempting restart'); // for example, server process killed or network down
-      oscPort = new osc.WebSocketPort({
-        socket: socket
-      });
-      oscPort.open();
-      console.log("Reopened WebSocketPort on " + socket_uri)
-    }
-  };
-  socket.onerror = (error) => {
-    console.log(`WebSocket error: ${error}`);
-  };
+  setupSocket();
 
 }
 
@@ -89,7 +92,8 @@ function draw() {
   text('GYRO Z: ' + gyro.z, 10, 240);
 
   // after signal processing and UI updates, send OSC messages
-  if (socket.readyState === WebSocket.OPEN) {
+  // if (socket.readyState === WebSocket.OPEN && socketIsConnected) {
+  if (socketIsConnected) {
     sendOSCMessages(eeg, '/muse/eeg/');
     sendOSCMessages(ppg, '/muse/ppg/');
   }
@@ -101,15 +105,21 @@ function sendOSCMessages(data, prefix) {
   let prevData = prefix === '/muse/eeg/' ? prevEegData : prevPpgData;
 
   Object.entries(data).forEach(([key, value]) => {
+    // don't write out the ppg/buffer
+    if (key === 'buffer') {
+      return;
+    }
+
     // Check if value has changed
     if (!prevData[key] || prevData[key] !== value) {
       const address = prefix + key;
+      const type = typeof value === 'number' ? (Number.isInteger(value) ? 'i' : 'f') : 's';
       const message = {
         address: address,
-        args: value
+        args: [{ type: type, value: value }]
       };
       const binaryData = osc.writeMessage(message);
-      if (socket.readyState === WebSocket.OPEN) {
+      if (socket.readyState === WebSocket.OPEN && socketIsConnected) {
         socket.send(binaryData);
       }
       // Update prevData with new value
@@ -117,3 +127,7 @@ function sendOSCMessages(data, prefix) {
     }
   });
 }
+
+
+
+

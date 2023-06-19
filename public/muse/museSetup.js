@@ -1,7 +1,7 @@
 //is it a Muse 1 (usePPG = false) or Muse 2 (usePPG = true)
 let usePPG = true;
 let connectButton;
-let isConnected = false;
+let museIsConnected = false;
 
 function setupMuse() {
   //this handles the bluetooth connection between the Muse and the computer

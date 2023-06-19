@@ -8,6 +8,9 @@ const MUSE_SERVICE = 0xfe8d
 let controlChar;
 const MUSE_CONTROL_ID = '273e0001-4c4d-454d-96be-f03bac821358';
 
+// sensor contact impedence
+// TODO: find these codes!!!
+
 //eeg sensors
 const MUSE_LEFT_EAR_ID = '273e0003-4c4d-454d-96be-f03bac821358';
 const MUSE_LEFT_FOREHEAD_ID = '273e0004-4c4d-454d-96be-f03bac821358';
