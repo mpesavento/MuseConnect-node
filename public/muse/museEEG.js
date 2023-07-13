@@ -193,6 +193,9 @@ function processEEG(sensor, data) {
     eeg.beta = betaTotal / sensorTotal;
     eeg.gamma = gammaTotal / sensorTotal;
 
+    // update the eeg object with relative energies for all bandwidths
+    getRelativeEnergies(eeg);
+
 }
 
 
@@ -222,5 +225,14 @@ function _getAverageByIndex(arrays) {
 }
 
 
+function getRelativeEnergies(eeg) {
+    // scale average bandwidths power to sum to 1
+    denom = 10^eeg.delta + 10^eeg.theta + 10^eeg.alpha + 10^eeg.beta + 10^eeg.gamma;
+    eeg.delta_relative = 10^eeg.delta / denom;
+    eeg.theta_relative = 10^eeg.theta / denom;
+    eeg.alpha_relative = 10^eeg.alpha / denom;
+    eeg.beta_relative = 10^eeg.beta / denom;
+    eeg.gamma_relative = 10^eeg.gamma / denom;
+} 
 
  
